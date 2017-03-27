@@ -1,0 +1,192 @@
+Android-Skin-Loader使用说明
+目录
+
+    1 skin-loader-lib（动态加载本地皮肤包进行换肤）开源库
+        1.1 使用说明
+            1.1.1 1.下载Android-Skin-Loader
+            1.1.2 2.在Application中进行初始化
+            1.1.3 3.在布局文件中标识需要换肤的View
+            1.1.4 4. 继承BaseActivity或者BaseFragmentActivity作为BaseActivity进行开发，Fragment 继承 BaseFragment 进行开发
+            1.1.5 5. 从.skin文件中设置皮肤
+            1.1.6 6. 重设默认皮肤
+            1.1.7 7. 对代码中创建的View的换肤支持
+            1.1.8 8. 在代码中setImgeView
+            1.1.9 9. 在android-skin-loader-lib库中扩展属性
+
+skin-loader-lib（动态加载本地皮肤包进行换肤）开源库
+
+    原理：打apk资源包，采用覆盖（资源名称覆盖）的形式替换主题 ，一套主题对应一个apk资源包
+    多主题可以将多个apk资源包放在同一目录下，遍历显示出来由用户选择 （将生成的apk文件改为(.skin)文件)
+    BMLauncher项目中将faacy.skin（资源文件）放到了assets中 copy到sdcard中
+    不支持 mipmap，需要将 mipmap 中的文件移动到 drawable 中 
+
+使用说明
+1.下载Android-Skin-Loader
+
+地址：https://github.com/fengjundev/Android-Skin-Loader
+
+    android-skin-loader-lib 将依赖库导入项目
+    android-skin-loader-skin 资源皮肤包 demo （将生成的apk文件改为(.skin)文件)
+
+使用gradle build android-skin-loader-skin工程后即可在skin-package目录下取皮肤包（修改脚本中def skinName = "BlackFantacy.skin"换成自己想要的皮肤名）
+2.在Application中进行初始化
+
+public class SkinApplication extends Application {
+		public void onCreate() {
+			super.onCreate();
+			// Must call init first 
+			SkinManager.getInstance().init(this);
+			SkinManager.getInstance().load();
+			}
+	}
+
+3.在布局文件中标识需要换肤的View
+
+              ...
+		xmlns:skin="http://schemas.android.com/android/skin"
+		...
+		  <TextView
+		     ...
+		     skin:enable="true" 
+		     ... />
+
+4. 继承BaseActivity或者BaseFragmentActivity作为BaseActivity进行开发，Fragment 继承 BaseFragment 进行开发
+5. 从.skin文件中设置皮肤
+
+String SKIN_NAME = "BlackFantacy.skin";
+String SKIN_DIR = Environment.getExternalStorageDirectory() + File.separator + SKIN_NAME;
+File skin = new File(SKIN_DIR);
+SkinManager.getInstance().load(skin.getAbsolutePath(),
+				new ILoaderListener() {
+					@Override
+					public void onStart() {
+					}
+
+					@Override
+					public void onSuccess() {
+					}
+
+					@Override
+					public void onFailed() {
+					}
+				});
+
+6. 重设默认皮肤
+
+SkinManager.getInstance().restoreDefaultTheme();
+
+7. 对代码中创建的View的换肤支持
+
+public interface IDynamicNewView {
+	void dynamicAddView(View view, List<DynamicAttr> pDAttrs);
+}
+
+动态创建View后，调用dynamicAddView方法注册该View至皮肤映射表即可
+
+private void dynamicAddTitleView() {
+		TextView textView = new TextView(getActivity());
+		textView.setText("Small Article (动态new的View)");
+		RelativeLayout.LayoutParams param = new RelativeLayout.LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+		param.addRule(RelativeLayout.CENTER_IN_PARENT);
+		textView.setLayoutParams(param);
+		textView.setTextColor(getActivity().getResources().getColor(R.color.color_title_bar_text));
+		textView.setTextSize(20);
+		titleBarLayout.addView(textView);
+		
+		List<DynamicAttr> mDynamicAttr = new ArrayList<DynamicAttr>();
+		mDynamicAttr.add(new DynamicAttr(AttrFactory.TEXT_COLOR, R.color.color_title_bar_text));
+		dynamicAddView(textView, mDynamicAttr);
+	}
+
+8. 在代码中setImgeView
+
+ mAudioBtn.setImageDrawable(SkinManager.getInstance().getDrawable(R.drawable.ic_local_mode));
+titleText.setTextColor(SkinManager.getInstance().getColor(R.color.ic_local_mode));
+
+9. 在android-skin-loader-lib库中扩展属性
+
+添加scr属性 AttrFactory.java
+
+public class AttrFactory {
+	public static final String SRC= "src";
+
+	public static final String BACKGROUND = "background";
+	public static final String TEXT_COLOR = "textColor";
+	public static final String LIST_SELECTOR = "listSelector";
+	public static final String DIVIDER = "divider";
+	
+	public static SkinAttr get(String attrName, int attrValueRefId, String attrValueRefName, String typeName){
+		
+		SkinAttr mSkinAttr = null;
+		
+		if (BACKGROUND.equals(attrName) || SRC.equals(attrName)) { 
+			mSkinAttr = new BackgroundAttr();
+		}else if(TEXT_COLOR.equals(attrName)){ 
+			mSkinAttr = new TextColorAttr();
+		}else if(LIST_SELECTOR.equals(attrName)){ 
+			mSkinAttr = new ListSelectorAttr();
+		}else if(DIVIDER.equals(attrName)){ 
+			mSkinAttr = new DividerAttr();
+		}else{
+			return null;
+		}
+		
+		mSkinAttr.attrName = attrName;
+		mSkinAttr.attrValueRefId = attrValueRefId;
+		mSkinAttr.attrValueRefName = attrValueRefName;
+		mSkinAttr.attrValueTypeName = typeName;
+		return mSkinAttr;
+	}
+	
+	/**
+	 * Check whether the attribute is supported
+	 * @param attrName
+	 * @return true : supported <br>
+	 * 		   false: not supported
+	 */
+	public static boolean isSupportedAttr(String attrName){
+               if (SRC.equals(attrName)) {
+			return true;
+		}
+		if(BACKGROUND.equals(attrName)){ 
+			return true;
+		}
+		if(TEXT_COLOR.equals(attrName)){ 
+			return true;
+		}
+		if(LIST_SELECTOR.equals(attrName)){ 
+			return true;
+		}
+		if(DIVIDER.equals(attrName)){ 
+			return true;
+		}
+		return false;
+	}
+}
+
+BackgroundAttr .java
+
+public class BackgroundAttr extends SkinAttr {
+
+	@Override
+	public void apply(View view) {
+		
+		if(RES_TYPE_NAME_COLOR.equals(attrValueTypeName)){
+			view.setBackgroundColor(SkinManager.getInstance().getColor(attrValueRefId));
+			Log.i("attr", "_________________________________________________________");
+			Log.i("attr", "apply as color");
+		}else if(RES_TYPE_NAME_DRAWABLE.equals(attrValueTypeName)){
+			Drawable bg = SkinManager.getInstance().getDrawable(attrValueRefId);
+			if(view instanceof ImageView){
+				((ImageView)view).setImageDrawable(bg);
+			}else{
+				view.setBackground(bg);
+			}
+			Log.i("attr", "_________________________________________________________");
+			Log.i("attr", "apply as drawable");
+			Log.i("attr", "bg.toString()  " + bg.toString());
+
+			Log.i("attr", this.attrValueRefName + " 是否可变换状态? : " + bg.isStateful());
+		}
+	}
+}
